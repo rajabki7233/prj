@@ -1,0 +1,218 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mavox Studio</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        /* BRIGHT THEMES DEFINED HERE */
+        :root {
+            --primary: #6366f1; --success: #10b981;
+            --bg: #f9fafb; --surface: #ffffff; --text: #111827; --text-muted: #6b7280; --border: #e5e7eb;
+            --shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);
+        }
+        /* Optional: A slightly cooler bright theme */
+        [data-theme="cool"] {
+            --bg: #f0f9ff; --surface: #ffffff; --text: #0f172a; --text-muted: #64748b; --border: #bae6fd;
+            --primary: #0ea5e9;
+        }
+
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { font-family: 'Inter', sans-serif; background-color: var(--bg); color: var(--text); line-height: 1.6; display: flex; flex-direction: column; min-height: 100vh; transition: background 0.3s, color 0.3s; }
+
+        /* Top Navbar */
+        .navbar { display: flex; justify-content: space-between; align-items: center; padding: 15px 40px; background: var(--surface); border-bottom: 1px solid var(--border); box-shadow: 0 1px 3px rgba(0,0,0,0.05); }
+        .logo { font-size: 1.4rem; font-weight: 800; text-decoration: none; color: var(--text); }
+        .logo span { color: var(--primary); }
+        .theme-switcher { display: flex; gap: 10px; }
+        .theme-btn { width: 24px; height: 24px; border-radius: 50%; border: 2px solid var(--border); cursor: pointer; transition: transform 0.2s; }
+        .theme-btn:hover { transform: scale(1.2); }
+
+        /* Main Content */
+        .main-content { flex: 1; padding: 40px; max-width: 1000px; margin: 0 auto; width: 100%; }
+        
+        .header { text-align: center; margin-bottom: 40px; }
+        .header h1 { font-size: 2.5rem; font-weight: 800; margin-bottom: 10px; color: var(--text); }
+        .header p { color: var(--text-muted); }
+
+        .card { background: var(--surface); border-radius: 16px; padding: 40px; margin-bottom: 30px; border: 1px solid var(--border); box-shadow: var(--shadow); transition: background 0.3s; }
+
+        .form-group { margin-bottom: 25px; }
+        label { display: block; font-weight: 600; font-size: 0.9rem; margin-bottom: 10px; color: var(--text); }
+        input[type="file"], select, textarea, input[type="number"], input[type="color"] {
+            width: 100%; padding: 14px; border: 1px solid var(--border); border-radius: 10px; font-family: inherit; font-size: 0.95rem; background: var(--bg); color: var(--text); transition: border-color 0.2s;
+        }
+        input:focus, select:focus, textarea:focus { outline: none; border-color: var(--primary); box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.2); }
+        
+        .flex-row { display: flex; gap: 20px; } .flex-row > div { flex: 1; }
+        
+        .checkbox-group { display: flex; align-items: center; gap: 12px; margin-top: 15px; background: var(--bg); padding: 16px; border-radius: 10px; border: 1px solid var(--border); cursor: pointer; }
+        .checkbox-group input { width: 20px; height: 20px; accent-color: var(--primary); cursor: pointer; }
+        .checkbox-group label { margin-bottom: 0; font-weight: 500; cursor: pointer; }
+        
+        .btn-submit { width: 100%; padding: 18px; background: var(--primary); color: white; border: none; border-radius: 10px; font-size: 1.1rem; font-weight: 600; cursor: pointer; transition: transform 0.1s, opacity 0.2s; margin-top: 10px; }
+        .btn-submit:hover { transform: translateY(-2px); opacity: 0.9; box-shadow: 0 4px 12px rgba(99, 102, 241, 0.3); }
+
+        .results-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 30px; margin-top: 20px; }
+        .image-container { text-align: center; background: var(--bg); padding: 20px; border-radius: 12px; border: 1px solid var(--border); }
+        .image-container h3 { font-size: 0.9rem; text-transform: uppercase; color: var(--text-muted); margin-bottom: 15px; }
+        .image-container img { width: 100%; border-radius: 8px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
+        
+        .download-btn { display: inline-flex; justify-content: center; gap: 8px; background: #ecfdf5; color: var(--success); padding: 14px; text-decoration: none; border-radius: 8px; margin-top: 20px; font-weight: 600; width: 100%; border: 1px solid #a7f3d0; transition: all 0.2s; }
+        .download-btn:hover { background: var(--success); color: white; }
+
+        .video-section { margin-top: 40px; border-top: 1px solid var(--border); padding-top: 30px; }
+        .video-container { border-radius: 12px; overflow: hidden; background: #000; }
+        video { width: 100%; display: block; }
+
+        .description-box { background: #eef2ff; border-left: 4px solid var(--primary); padding: 25px; border-radius: 0 12px 12px 0; margin-top: 40px; }
+        .description-box h4 { color: var(--primary); margin-bottom: 10px; }
+        
+        .error { background: #fef2f2; color: #ef4444; padding: 15px; border-radius: 8px; border: 1px solid #fecaca; margin-top: 20px; }
+        .hidden { display: none; }
+
+        @media (max-width: 768px) {
+            .results-grid { grid-template-columns: 1fr; }
+            .flex-row { flex-direction: column; gap: 10px; }
+            .navbar { padding: 15px 20px; }
+        }
+    </style>
+    <script>
+        function toggleFields() {
+            var tool = document.getElementById('tool').value;
+            document.getElementById('resize-fields').style.display = (tool === 'resize') ? 'flex' : 'none';
+            document.getElementById('color-container').style.display = (tool === 'background_removal') ? 'block' : 'none';
+        }
+        
+        function setTheme(themeName) {
+            document.documentElement.setAttribute('data-theme', themeName);
+            localStorage.setItem('mavox-theme', themeName);
+        }
+        
+        window.onload = function() {
+            toggleFields();
+            const savedTheme = localStorage.getItem('mavox-theme') || 'light'; // Defaults to Light Mode now!
+            document.documentElement.setAttribute('data-theme', savedTheme);
+        };
+    </script>
+</head>
+<body>
+
+    <!-- Top Navbar -->
+    <nav class="navbar">
+        <a href="/" class="logo"><span>Mavox</span> Studio</a>
+        <div class="theme-switcher">
+            <div class="theme-btn" style="background: #ffffff; border-color: #cbd5e1;" onclick="setTheme('light')" title="Bright Mode"></div>
+            <div class="theme-btn" style="background: #f0f9ff; border-color: #bae6fd;" onclick="setTheme('cool')" title="Cool Blue"></div>
+            <div class="theme-btn" style="background: #0f172a;" onclick="setTheme('dark')" title="Dark Mode"></div>
+        </div>
+    </nav>
+
+    <main class="main-content">
+        <div class="header">
+            <h1>Studio Workspace</h1>
+            <p>Upload your shot, select a tool, and let Mavox handle the rest.</p>
+        </div>
+
+        <div class="card">
+            <form method="POST" enctype="multipart/form-data">
+                <div class="form-group">
+                    <label>1. Upload Image</label>
+                    <input type="file" name="file" accept="image/*" required>
+                </div>
+                
+                <div class="form-group">
+                    <label>2. Choose Editing Tool</label>
+                    <select name="tool" id="tool" onchange="toggleFields()" required>
+                        <option value="optimize">✨ Optimize (Auto Format & Quality)</option>
+                        <option value="resize">📐 Resize (Manual Width/Height)</option>
+                        <option value="auto_crop">🔲 Auto-Crop (500x500 Square)</option>
+                        <option value="grayscale">🌑 Black & White</option>
+                        <option value="sepia">🟤 Sepia Effect</option>
+                        <option value="blur">💨 Blur</option>
+                        <option value="sharpen">🔪 Sharpen Image</option>
+                        <option value="pixelate">👾 Pixelate Effect</option>
+                        <option value="background_removal">🪄 Change Background (AI)</option>
+                        <optgroup label="Artistic Filters (Free)">
+                            <option value="cartoonify">🎨 Cartoonify</option>
+                            <option value="vignette">🌘 Vignette</option>
+                            <option value="oil_paint">🖌️ Oil Paint</option>
+                            <option value="art_zorro">🦸 Zorro</option>
+                            <option value="art_athena">🏛️ Athena</option>
+                            <option value="art_peacock">🦚 Peacock</option>
+                            <option value="art_audrey">👩 Audrey</option>
+                        </optgroup>
+                    </select>
+                </div>
+
+                <div id="resize-fields" class="flex-row hidden form-group">
+                    <div><label>Width (px)</label><input type="number" name="width" placeholder="e.g. 800" min="1"></div>
+                    <div><label>Height (px)</label><input type="number" name="height" placeholder="Auto" min="1"></div>
+                </div>
+
+                <div id="color-container" class="hidden form-group">
+                    <label>New Background Color</label>
+                    <input type="color" name="bg_color" value="#ffffff" style="height: 50px; padding: 5px;">
+                </div>
+
+                <hr style="margin: 30px 0; border: 0; border-top: 1px solid var(--border);">
+
+                <div class="form-group">
+                    <label>3. Description (Optional)</label>
+                    <textarea name="manual_desc" rows="3" placeholder="Type your own caption here..."></textarea>
+                </div>
+                
+                <div class="checkbox-group">
+                    <input type="checkbox" name="auto_desc" id="auto_desc">
+                    <label for="auto_desc">🧠 Auto-generate description</label>
+                </div>
+
+                <div class="checkbox-group">
+                    <input type="checkbox" name="generate_video" id="generate_video">
+                    <label for="generate_video">🎬 Generate animated video</label>
+                </div>
+                
+                <button type="submit" class="btn-submit">✨ Process Image</button>
+            </form>
+            
+            {% if error_msg %}<div class="error">{{ error_msg }}</div>{% endif %}
+        </div>
+
+        {% if result_url %}
+        <div class="card">
+            <h2 style="text-align: center; margin-bottom: 30px;">Your Results</h2>
+            <div class="results-grid">
+                <div class="image-container">
+                    <h3>Original</h3>
+                    <img src="{{ original_url }}" alt="Original">
+                </div>
+                <div class="image-container">
+                    <h3>Edited</h3>
+                    <img src="{{ result_url }}" alt="Edited">
+                    <a href="{{ result_url.replace('/upload/', '/upload/fl_attachment/') }}" class="download-btn" download>⬇ Download Image</a>
+                </div>
+            </div>
+
+            {% if video_path %}
+            <div class="video-section">
+                <h3>🎬 Animated Video</h3>
+                <div class="video-container">
+                    <video controls autoplay loop>
+                        <source src="{{ video_path }}" type="video/mp4">
+                    </video>
+                </div>
+            </div>
+            {% endif %}
+
+            {% if final_description %}
+            <div class="description-box">
+                <h4>🧠 Description</h4>
+                <p>{{ final_description }}</p>
+            </div>
+            {% endif %}
+        </div>
+        {% endif %}
+    </main>
+</body>
+</html>

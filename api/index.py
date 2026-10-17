@@ -1,48 +1,66 @@
 import os
+import json
 import subprocess
 import urllib.request
 import cloudinary
 import cloudinary.uploader
 from cloudinary.utils import cloudinary_url
 from flask import Flask, render_template, request
-from google import genai
-from google.genai import types
 
 app = Flask(__name__)
 
-# --- 1. Configuration for Vercel ---
-# Vercel will inject these from your Environment Variables settings
-cloudinary.config(
-    cloud_name="k3ejz9zm",
-    api_key="353181634129514",
-    api_secret=os.environ.get('CLOUDINARY_SECRET', 'fallback_secret_if_local'),
-    secure=True
-)
-
-# Initialize Gemini
-gemini_key = os.environ.get('GEMINI_API_KEY')
-if gemini_key:
-    os.environ["GEMINI_API_KEY"] = gemini_key
-    client = genai.Client()
+# --- 1. Load Configuration (Safe for Hosting & Local) ---
+if os.environ.get('CLOUDINARY_SECRET'):
+    # HOSTING MODE (Vercel/Render will use this)
+    cloudinary.config(
+        cloud_name="k3ejz9zm",
+        api_key="353181634129514",
+        api_secret=os.environ.get('CLOUDINARY_SECRET'),
+        secure=True
+    )
+    FFMPEG_PATH = "ffmpeg"
+else:
+    # LOCAL MODE (Your computer will use this)
+    try:
+        with open('config.json', 'r') as f:
+            config = json.load(f)
+        
+        cloudinary.config(
+            cloud_name=config['cloudinary']['cloud_name'],
+            api_key=config['cloudinary']['api_key'],
+            api_secret=config['cloudinary']['api_secret'],
+            secure=True
+        )
+        FFMPEG_PATH = config.get('ffmpeg', {}).get('path', 'ffmpeg')
+    except FileNotFoundError:
+        # Fallback if config.json is missing locally
+        print("WARNING: config.json not found. Please set CLOUDINARY_SECRET env variable.")
+        cloudinary.config(
+            cloud_name="k3ejz9zm",
+            api_key="353181634129514",
+            api_secret="YOUR_LOCAL_SECRET", # Hardcode here ONLY for local quick tests
+            secure=True
+        )
+        FFMPEG_PATH = "ffmpeg"
 
 # --- 2. Auto-description fallback ---
 AUTO_DESCRIPTIONS = {
-    'optimize': 'This image has been automatically optimized for the web...',
-    'auto_crop': 'This image has been intelligently auto-cropped...',
-    'resize': 'This image has been resized to your specific dimensions...',
-    'grayscale': 'This image has been converted to a classic black and white format...',
-    'sepia': 'This image has been treated with a warm sepia filter...',
-    'blur': 'This image has been processed with a strong blur effect...',
-    'sharpen': 'This image has been enhanced with a sharpening filter...',
-    'pixelate': 'This image has been transformed into a pixelated mosaic...',
-    'background_removal': 'The original background has been removed and replaced...',
-    'cartoonify': 'This image has been transformed into a cartoon-style illustration...',
-    'vignette': 'A vignette effect has been applied...',
-    'oil_paint': 'This image has been rendered with an oil painting effect...',
-    'art_zorro': 'The "Zorro" artistic filter has been applied...',
-    'art_athena': 'The "Athena" artistic filter has been applied...',
-    'art_peacock': 'The "Peacock" artistic filter has been applied...',
-    'art_audrey': 'The "Audrey" artistic filter has been applied...'
+    'optimize': 'This image has been automatically optimized for the web, reducing file size while maintaining high visual quality.',
+    'auto_crop': 'This image has been intelligently auto-cropped into a perfect 500x500 square, focusing automatically on the main subject.',
+    'resize': 'This image has been resized to your specific dimensions while preserving the aspect ratio and visual clarity.',
+    'grayscale': 'This image has been converted to a classic black and white format, giving it a timeless and dramatic look.',
+    'sepia': 'This image has been treated with a warm sepia filter, creating a vintage, nostalgic, and antique photographic effect.',
+    'blur': 'This image has been processed with a strong blur effect, often used to create a soft background or abstract artistic look.',
+    'sharpen': 'This image has been enhanced with a sharpening filter to make edges crisper and details pop out more clearly.',
+    'pixelate': 'This image has been transformed into a pixelated mosaic, creating a retro, 8-bit style digital art effect.',
+    'background_removal': 'The original background of this image has been completely removed using AI, and replaced with a new solid color of your choice.',
+    'cartoonify': 'This image has been transformed into a cartoon-style illustration, giving it a fun and animated look.',
+    'vignette': 'A vignette effect has been applied, subtly darkening the edges to draw focus to the center of the image.',
+    'oil_paint': 'This image has been rendered with an oil painting effect, giving it a textured, artistic, brush-stroke appearance.',
+    'art_zorro': 'The "Zorro" artistic filter has been applied, creating a dramatic, high-contrast, black-and-white look.',
+    'art_athena': 'The "Athena" artistic filter has been applied, adding a warm, golden, painterly tone to the image.',
+    'art_peacock': 'The "Peacock" artistic filter has been applied, enhancing the colors with vibrant, vivid tones.',
+    'art_audrey': 'The "Audrey" artistic filter has been applied, creating a soft, vintage greyscale aesthetic.'
 }
 
 @app.route('/', methods=['GET', 'POST'])
@@ -66,10 +84,6 @@ def index():
 
         if file and file.filename != '':
             try:
-                file_bytes = file.read()
-                file.seek(0)
-                mime_type = file.mimetype or "image/jpeg"
-
                 # --- 3. Upload to Cloudinary ---
                 upload_result = cloudinary.uploader.upload(file)
                 public_id = upload_result['public_id']
@@ -115,55 +129,49 @@ def index():
                 else:
                     result_url = original_url
 
-                # --- 5. Generate Video (Safely caught for Vercel) ---
+                # --- 5. Generate Video (FFmpeg) ---
                 if generate_video and result_url:
                     try:
-                        local_img = f"/tmp/temp_{public_id}.jpg" # Vercel allows writing to /tmp
+                        # Use /tmp for Vercel compatibility, or local directory
+                        temp_dir = "/tmp" if os.environ.get('VERCEL') else "."
+                        local_img = os.path.join(temp_dir, f"temp_{public_id}.jpg")
+                        video_filename = os.path.join(temp_dir, f"animated_{public_id}.mp4")
+
                         urllib.request.urlretrieve(result_url, local_img)
                         
-                        video_filename = f"/tmp/animated_{public_id}.mp4"
-
                         cmd = [
-                            "ffmpeg", "-y", "-loop", "1", "-i", local_img,
+                            FFMPEG_PATH, "-y", "-loop", "1", "-i", local_img,
                             "-vf", "zoompan=z='min(zoom+0.0015,1.15)':d=75:s=1280x720",
                             "-c:v", "libx264", "-t", "3", "-pix_fmt", "yuv420p",
                             video_filename
                         ]
                         subprocess.run(cmd, capture_output=True, check=True)
-                        
-                        # Note: Serving videos from Vercel /tmp requires a different setup, 
-                        # so we will just skip showing the video on the live site to prevent crashes.
-                        pass 
-                    except Exception as vid_err:
-                        print(f"Video generation failed (Expected on Vercel): {vid_err}")
 
-                # --- 6. Description ---
+                        if os.path.exists(video_filename) and os.path.getsize(video_filename) > 0:
+                            if os.environ.get('VERCEL'):
+                                # Note: Serving video from Vercel /tmp requires an API route, 
+                                # so we skip displaying it on Vercel to prevent crashes.
+                                print("Video generated in /tmp (Vercel doesn't serve it directly).")
+                            else:
+                                # Local mode: Move to static folder for Flask to serve
+                                os.makedirs("static", exist_ok=True)
+                                final_video_path = f"static/animated_{public_id}.mp4"
+                                os.rename(video_filename, final_video_path)
+                                video_path = "/" + final_video_path
+                        
+                        # Cleanup
+                        if os.path.exists(local_img):
+                            os.remove(local_img)
+                    except Exception as vid_err:
+                        print(f"Video generation failed: {vid_err}")
+
+                # --- 6. Description (No Gemini, just fallback) ---
                 if manual_desc:
                     final_description = manual_desc
-                elif use_auto_desc and gemini_key:
-                    try:
-                        prompt = (
-                            f"You are an expert image analyst. Look at this image carefully. "
-                            f"The user has applied the '{selected_tool}' effect to it. "
-                            f"Write a detailed, engaging paragraph (3-4 sentences) describing: "
-                            f"1. The main subjects and objects. "
-                            f"2. The setting and environment. "
-                            f"3. The mood, lighting, and colors. "
-                            f"4. How the '{selected_tool}' effect changes the overall feel."
-                        )
-                        gemini_response = client.models.generate_content(
-                            model="gemini-2.5-flash",
-                            contents=[
-                                types.Part.from_bytes(data=file_bytes, mime_type=mime_type),
-                                prompt
-                            ]
-                        )
-                        final_description = gemini_response.text.strip()
-                    except Exception as gemini_err:
-                        print(f"Gemini error: {gemini_err}")
-                        final_description = AUTO_DESCRIPTIONS.get(selected_tool, "No description available.")
+                elif use_auto_desc:
+                    final_description = AUTO_DESCRIPTIONS.get(selected_tool, "No description available.")
                 else:
-                    final_description = AUTO_DESCRIPTIONS.get(selected_tool, "No description provided.")
+                    final_description = "No description provided."
 
             except Exception as e:
                 error_msg = f"Error: {str(e)}"
