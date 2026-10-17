@@ -1,5 +1,4 @@
 import os
-import json
 import subprocess
 import urllib.request
 import cloudinary
@@ -11,34 +10,20 @@ from google.genai import types
 
 app = Flask(__name__)
 
-# --- 1. Load Configuration (Safe for Hosting & Local) ---
-if os.environ.get('CLOUDINARY_SECRET'):
-    # HOSTING MODE (Render will use this)
-    cloudinary.config(
-        cloud_name="k3ejz9zm",
-        api_key="353181634129514",
-        api_secret=os.environ.get('CLOUDINARY_SECRET'),
-        secure=True
-    )
-    gemini_api_key = os.environ.get('GEMINI_API_KEY')
-    FFMPEG_PATH = "ffmpeg"
-else:
-    # LOCAL MODE (Your computer will use this)
-    with open('config.json', 'r') as f:
-        config = json.load(f)
-    
-    cloudinary.config(
-        cloud_name=config['cloudinary']['cloud_name'],
-        api_key=config['cloudinary']['api_key'],
-        api_secret=config['cloudinary']['api_secret'],
-        secure=True
-    )
-    gemini_api_key = config['gemini']['api_key']
-    FFMPEG_PATH = config['ffmpeg']['path']
+# --- 1. Configuration for Vercel ---
+# Vercel will inject these from your Environment Variables settings
+cloudinary.config(
+    cloud_name="k3ejz9zm",
+    api_key="353181634129514",
+    api_secret=os.environ.get('CLOUDINARY_SECRET', 'fallback_secret_if_local'),
+    secure=True
+)
 
-# Set Gemini Client
-os.environ["GEMINI_API_KEY"] = gemini_api_key
-client = genai.Client()
+# Initialize Gemini
+gemini_key = os.environ.get('GEMINI_API_KEY')
+if gemini_key:
+    os.environ["GEMINI_API_KEY"] = gemini_key
+    client = genai.Client()
 
 # --- 2. Auto-description fallback ---
 AUTO_DESCRIPTIONS = {
@@ -81,7 +66,6 @@ def index():
 
         if file and file.filename != '':
             try:
-                # Read bytes for Gemini before Cloudinary consumes the stream
                 file_bytes = file.read()
                 file.seek(0)
                 mime_type = file.mimetype or "image/jpeg"
@@ -131,33 +115,32 @@ def index():
                 else:
                     result_url = original_url
 
-                # --- 5. Generate Video (FFmpeg) ---
+                # --- 5. Generate Video (Safely caught for Vercel) ---
                 if generate_video and result_url:
                     try:
-                        local_img = f"temp_{public_id}.jpg"
+                        local_img = f"/tmp/temp_{public_id}.jpg" # Vercel allows writing to /tmp
                         urllib.request.urlretrieve(result_url, local_img)
-                        os.makedirs("static", exist_ok=True)
-                        video_filename = f"static/animated_{public_id}.mp4"
+                        
+                        video_filename = f"/tmp/animated_{public_id}.mp4"
 
                         cmd = [
-                            FFMPEG_PATH, "-y", "-loop", "1", "-i", local_img,
+                            "ffmpeg", "-y", "-loop", "1", "-i", local_img,
                             "-vf", "zoompan=z='min(zoom+0.0015,1.15)':d=75:s=1280x720",
                             "-c:v", "libx264", "-t", "3", "-pix_fmt", "yuv420p",
                             video_filename
                         ]
                         subprocess.run(cmd, capture_output=True, check=True)
-
-                        if os.path.exists(video_filename) and os.path.getsize(video_filename) > 0:
-                            video_path = "/" + video_filename
-                        if os.path.exists(local_img):
-                            os.remove(local_img)
+                        
+                        # Note: Serving videos from Vercel /tmp requires a different setup, 
+                        # so we will just skip showing the video on the live site to prevent crashes.
+                        pass 
                     except Exception as vid_err:
-                        print(f"Video generation failed: {vid_err}")
+                        print(f"Video generation failed (Expected on Vercel): {vid_err}")
 
                 # --- 6. Description ---
                 if manual_desc:
                     final_description = manual_desc
-                elif use_auto_desc:
+                elif use_auto_desc and gemini_key:
                     try:
                         prompt = (
                             f"You are an expert image analyst. Look at this image carefully. "
@@ -180,7 +163,7 @@ def index():
                         print(f"Gemini error: {gemini_err}")
                         final_description = AUTO_DESCRIPTIONS.get(selected_tool, "No description available.")
                 else:
-                    final_description = "No description provided."
+                    final_description = AUTO_DESCRIPTIONS.get(selected_tool, "No description provided.")
 
             except Exception as e:
                 error_msg = f"Error: {str(e)}"
