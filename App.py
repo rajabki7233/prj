@@ -11,24 +11,34 @@ from google.genai import types
 
 app = Flask(__name__)
 
-# --- 1. Load Configuration from JSON ---
-with open('config.json', 'r') as f:
-    config = json.load(f)
+# --- 1. Load Configuration (Safe for Hosting & Local) ---
+if os.environ.get('CLOUDINARY_SECRET'):
+    # HOSTING MODE (Render will use this)
+    cloudinary.config(
+        cloud_name="k3ejz9zm",
+        api_key="353181634129514",
+        api_secret=os.environ.get('CLOUDINARY_SECRET'),
+        secure=True
+    )
+    gemini_api_key = os.environ.get('GEMINI_API_KEY')
+    FFMPEG_PATH = "ffmpeg"
+else:
+    # LOCAL MODE (Your computer will use this)
+    with open('config.json', 'r') as f:
+        config = json.load(f)
+    
+    cloudinary.config(
+        cloud_name=config['cloudinary']['cloud_name'],
+        api_key=config['cloudinary']['api_key'],
+        api_secret=config['cloudinary']['api_secret'],
+        secure=True
+    )
+    gemini_api_key = config['gemini']['api_key']
+    FFMPEG_PATH = config['ffmpeg']['path']
 
-# Cloudinary Config
-cloudinary.config(
-    cloud_name=config['cloudinary']['cloud_name'],
-    api_key=config['cloudinary']['api_key'],
-    api_secret=config['cloudinary']['api_secret'],
-    secure=True
-)
-
-# Gemini Config
-os.environ["GEMINI_API_KEY"] = config['gemini']['api_key']
+# Set Gemini Client
+os.environ["GEMINI_API_KEY"] = gemini_api_key
 client = genai.Client()
-
-# FFmpeg Path
-FFMPEG_PATH = config['ffmpeg']['path']
 
 # --- 2. Auto-description fallback ---
 AUTO_DESCRIPTIONS = {
